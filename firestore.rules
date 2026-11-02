@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function approved() { return signedIn() && myProfile().status == 'approved'; }
+    function admin() { return approved() && myProfile().role == 'admin'; }
+
+    match /users/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.role == 'member';
+      allow read: if signedIn() && (request.auth.uid == uid || admin());
+      allow update: if admin() ||
+        (signedIn() && request.auth.uid == uid
+         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','field','bio']));
+      allow delete: if admin();
+    }
+
+    match /messages/{messageId} {
+      allow read: if approved();
+      allow create: if approved()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 3000;
+      allow update, delete: if admin();
+    }
+
+    match /ideas/{ideaId} {
+      allow read: if approved();
+      allow create: if approved()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.description is string;
+      allow update, delete: if admin();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if approved();
+      allow create, update, delete: if admin();
+    }
+  }
+}

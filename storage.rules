@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Storage is intentionally closed until authenticated upload workflows,
+    // file size limits and file-type validation have been implemented.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
